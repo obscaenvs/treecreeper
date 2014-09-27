@@ -1,0 +1,5 @@
+remote_user:root
+remote_machine:dev.bugthunk.net
+remote_directory:/usr/local/dev/lib/Treecreeper
+remote_method:rsync -vrP
+local_ignore:.git
