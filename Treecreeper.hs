@@ -28,12 +28,13 @@ node = Node <$> value <*> (try (descendToken *> subForest <* ascendToken) <|> re
             <?> "empty node encountered."
 
 value :: Parser String
-value = try (anyChar `many1TillExcl`
-                     (choice [nodeToken, descendToken, ascendToken])) <|>
+value = try (anyChar `many1Till` (noConsume stopTokens)) <|>
         (anyChar `many1Till` eof)
+    where stopTokens = choice [nodeToken, descendToken, ascendToken]
 
+-- allows an empty subforest, but's that intended.
 subForest :: Parser (Forest String)
-subForest = (nodeToken *> node) `many1TillExcl'` ascendToken
+subForest =  (nodeToken *> node) `manyTill` (noConsume ascendToken)
 
 mkToken :: String -> Parser String
 mkToken str = try $ withSpaces (string str <* notFollowedBy alphaNum)
@@ -59,27 +60,15 @@ withSpaces p = spaces *> p <* spaces
 initBy1 :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m sep -> ParsecT s u m [a]
 initBy1 p sep = many1 (sep >> p)
 
-manyTillExcl :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m sep -> ParsecT s u m [a]
-manyTillExcl p end = (try $ many1TillExcl p end) <|> return []
-
 many1Till :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m sep -> ParsecT s u m [a]
-many1Till p end = many1TillExcl p end <* end
-
-many1TillExcl :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m sep -> ParsecT s u m [a]
-many1TillExcl p end = scan
+many1Till p end = scan
     where scan = do 
-            x <- p
-            do { (try $ lookAhead end) *> return [x] } <|> do { xs <- scan; return (x:xs) }
+                   x <- p
+                   do { end *> return [x] } <|> do { xs <- scan; return (x:xs) }
 
+noConsume :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m a
+noConsume = try . lookAhead
 
-many1TillExcl' :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m sep -> ParsecT s u m [a]
-many1TillExcl' p end = scan
-    where scan = do 
-            x <- p
-            do { (noconsume end) *> return [x] } <|> do { xs <- scan; return (x:xs) }
-
-noconsume :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m a
-noconsume = try . lookAhead
 --------------------------------------------------------------------------------
 --                                                                            --
 --                                     Main                                   --
